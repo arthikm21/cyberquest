@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(124,58,237,0.15), transparent 60%),
+    radial-gradient(1000px 500px at -10% 100%, rgba(0,212,255,0.12), transparent 60%),
+    #0a0e1a;
+  background-attachment: fixed;
+}
+
+/* matrix grid bg */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.glass {
+  background: rgba(17,24,39,0.55);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #00d4ff, #7c3aed);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-200 select-none;
+  min-height: 44px;
+}
+.btn-primary {
+  @apply btn bg-accent1 text-bg hover:scale-[1.03] hover:shadow-neon;
+}
+.btn-secondary {
+  @apply btn bg-surface text-text-primary border border-border hover:border-accent1;
+}
+.btn-ghost {
+  @apply btn bg-transparent text-text-secondary hover:text-text-primary;
+}
+
+.card {
+  @apply glass rounded-2xl p-5;
+}
+
+.input {
+  @apply bg-surface border border-border rounded-lg px-3 py-2 text-text-primary outline-none focus:border-accent1 focus:shadow-neon transition-all;
+  min-height: 44px;
+}
+
+/* focus visible */
+:focus-visible {
+  outline: 2px solid #00d4ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.flip-card {
+  perspective: 1000px;
+}
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+.flip-card.flipped .flip-card-inner {
+  transform: rotateY(180deg);
+}
+.flip-card-front, .flip-card-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-card-back {
+  transform: rotateY(180deg);
+}
+
+/* xp floater */
+.xp-floater {
+  position: fixed;
+  pointer-events: none;
+  font-weight: 800;
+  color: #00d4ff;
+  text-shadow: 0 0 12px rgba(0,212,255,0.6);
+  z-index: 60;
+}
