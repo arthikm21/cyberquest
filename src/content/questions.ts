@@ -257,12 +257,9 @@ export const QUESTIONS: Question[] = [
     options: ['Avoidance', 'Mitigation', 'Transfer', 'Acceptance'],
     correct: [1, 2, 3],
     explanation: {
-      why_correct: 'Only avoidance eliminates the risk entirely. Mitigation reduces it (residual remains), transfer shifts financial impact (operational residual remains), and acceptance retains the full residual.',
+      why_correct: 'Mitigation reduces but does not eliminate (residual remains), transfer shifts financial impact (operational residual remains), acceptance retains the full residual. Only avoidance discontinues the activity entirely, eliminating residual.',
       why_wrong: [
-        'Avoidance eliminates the activity — no residual risk remains for that activity.',
-        '— (correct option; not a wrong answer)',
-        '— (correct option; not a wrong answer)',
-        '— (correct option; not a wrong answer)',
+        'Avoidance is the one treatment that removes residual risk — discontinue the activity and there is nothing left to manage.',
       ],
       refModuleId: 'd1-risk',
     },
@@ -357,7 +354,7 @@ export const QUESTIONS: Question[] = [
     explanation: {
       why_correct: 'False. Qualitative uses subjective labels (H/M/L). Quantitative uses numbers (ALE, SLE, ARO, EF).',
       why_wrong: [
-        '— (this is the True option; not selected).',
+        'True is wrong — subjective labels are the hallmark of QUALITATIVE analysis. Quantitative analysis assigns concrete numeric values.',
       ],
       refModuleId: 'd1-risk',
     },
@@ -786,10 +783,9 @@ export const QUESTIONS: Question[] = [
     explanation: {
       why_correct: 'Canon II is "Act honorably, honestly, justly, responsibly, and legally."',
       why_wrong: [
-        'Canon I.',
-        '— (correct option; not a wrong answer)',
-        'Canon III.',
-        'Canon IV.',
+        'That is Canon I — first, not second.',
+        'That is Canon III — third, not second.',
+        'That is Canon IV — fourth, not second.',
       ],
       refModuleId: 'd1-ethics',
     },
@@ -1034,9 +1030,9 @@ export const QUESTIONS: Question[] = [
     options: ['True', 'False'],
     correct: 1,
     explanation: {
-      why_correct: 'False. A vulnerability is a weakness; an exploit takes advantage of it; an attack is the act.',
+      why_correct: 'False. A vulnerability is a passive weakness. An exploit is the technique that leverages it. An attack is the act of using the exploit.',
       why_wrong: [
-        '— (True option; not selected).',
+        'True is wrong — confuses the weakness with the action against it. The weakness alone is the vulnerability; without an actor and exploit it is just an exposure waiting to be addressed.',
       ],
       refModuleId: 'd2-ir',
     },
@@ -1506,9 +1502,9 @@ export const QUESTIONS: Question[] = [
     options: ['True', 'False'],
     correct: 0,
     explanation: {
-      why_correct: 'True. A user with the role may still be denied access to specific data without a business need.',
+      why_correct: 'True. Role grants the broad permission set; need-to-know filters it down to the specific records the user has a business reason to see right now.',
       why_wrong: [
-        '— (False; not selected).',
+        'False is wrong — role-based access and need-to-know are layered, not equivalent. A DBA may have the role to query a payroll table yet have no need-to-know for an individual employee\'s record.',
       ],
       refModuleId: 'd3-logical',
     },
@@ -1960,9 +1956,9 @@ export const QUESTIONS: Question[] = [
     options: ['True', 'False'],
     correct: 1,
     explanation: {
-      why_correct: 'False. MD5 is collision-broken. Use bcrypt, scrypt, or Argon2 for password hashing.',
+      why_correct: 'False. MD5 is collision-broken and far too fast for password hashing — modern GPUs crack billions of MD5 hashes per second. Use a deliberately slow adaptive function: bcrypt, scrypt, or Argon2.',
       why_wrong: [
-        '— (True option; not selected).',
+        'True is wrong — even outside the collision attacks, MD5 is unsuitable for passwords because it is fast. Password hashes must be slow to defeat brute force.',
       ],
       refModuleId: 'd5-crypto',
     },
