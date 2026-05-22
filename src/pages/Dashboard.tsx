@@ -62,12 +62,20 @@ export default function Dashboard() {
   const nav = useNavigate();
 
   const today = new Date().toISOString().slice(0, 10);
+  const dailyPool = useMemo(() => QUESTIONS.filter((q) => q.type !== 'multi'), []);
   const dailyQ = useMemo(() => {
-    if (daily?.dateISO === today) return QUESTIONS.find((q) => q.id === daily.questionId)!;
-    const idx = Math.floor((Date.now() / 86400000)) % QUESTIONS.length;
-    const q = QUESTIONS[idx];
-    return q;
-  }, [daily, today]);
+    if (daily?.dateISO === today) {
+      const found = QUESTIONS.find((q) => q.id === daily.questionId);
+      if (found) return found;
+    }
+    const idx = Math.floor((Date.now() / 86400000)) % dailyPool.length;
+    return dailyPool[idx];
+  }, [daily, today, dailyPool]);
+
+  const isDailyCorrect = (i: number) => {
+    if (Array.isArray(dailyQ.correct)) return dailyQ.correct.includes(i);
+    return dailyQ.correct === i;
+  };
 
   if (!daily || daily.dateISO !== today) {
     setDaily({ dateISO: today, questionId: dailyQ.id, done: false });
@@ -78,7 +86,7 @@ export default function Dashboard() {
   function answerDaily(i: number) {
     if (daily?.done) return;
     setPicked(i);
-    const correct = i === dailyQ.correct;
+    const correct = isDailyCorrect(i);
     recordQuiz({ id: dailyQ.id, correct, domain: dailyQ.domain });
     setDaily({ dateISO: today, questionId: dailyQ.id, done: true, correct });
     if (correct) addXP(100);
@@ -164,9 +172,9 @@ export default function Dashboard() {
             <div className="text-warning text-sm font-mono">+100 XP</div>
           </div>
           <div className="grid sm:grid-cols-2 gap-2 mt-3">
-            {dailyQ.options?.map((opt, i) => {
+            {dailyQ.options.map((opt, i) => {
               const done = daily?.done;
-              const correct = i === dailyQ.correct;
+              const correct = isDailyCorrect(i);
               const isPicked = picked === i;
               const cls = !done
                 ? 'border-border hover:border-accent1'
@@ -189,7 +197,7 @@ export default function Dashboard() {
           </div>
           {daily?.done && (
             <p className={'mt-3 text-sm ' + (daily.correct ? 'text-success' : 'text-danger')}>
-              {daily.correct ? '✓ Correct.' : '✗ Not quite.'} {dailyQ.explanation}
+              {daily.correct ? '✓ Correct.' : '✗ Not quite.'} {dailyQ.explanation.why_correct}
             </p>
           )}
         </div>

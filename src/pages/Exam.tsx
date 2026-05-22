@@ -6,9 +6,25 @@ import { Question } from '../content/types';
 
 const RadarReview = lazy(() => import('../components/RadarReview'));
 
-const EXAM_QS = Math.min(30, QUESTIONS.length); // available pool
+const EXAM_POOL = QUESTIONS.filter((q) => q.type !== 'multi');
+const EXAM_QS = Math.min(30, EXAM_POOL.length); // bumped to 100 in Task 5
 const EXAM_SECONDS = 3 * 60 * 60;
 const PASS = 70;
+
+function isCorrectIndex(q: Question, i: number | null): boolean {
+  if (i === null || i < 0) return false;
+  if (Array.isArray(q.correct)) return q.correct.includes(i);
+  return q.correct === i;
+}
+
+function correctIndexOf(q: Question): number {
+  return Array.isArray(q.correct) ? q.correct[0] : q.correct;
+}
+
+function wrongIndexFor(q: Question, picked: number): number {
+  if (Array.isArray(q.correct)) return -1;
+  return picked < q.correct ? picked : picked - 1;
+}
 
 export default function Exam() {
   const [phase, setPhase] = useState<'intro' | 'taking' | 'done'>('intro');
@@ -38,7 +54,7 @@ export default function Exam() {
   }, [remaining, phase]);
 
   function start() {
-    const qs = pickRandom(QUESTIONS, EXAM_QS);
+    const qs = pickRandom(EXAM_POOL, EXAM_QS);
     setQuestions(qs);
     setAnswers(Array(qs.length).fill(null));
     setFlagged(Array(qs.length).fill(false));
@@ -57,7 +73,7 @@ export default function Exam() {
   }
 
   function finish() {
-    const correct = questions.reduce((s, q, i) => s + (answers[i] === q.correct ? 1 : 0), 0);
+    const correct = questions.reduce((s, q, i) => s + (isCorrectIndex(q, answers[i]) ? 1 : 0), 0);
     recordExam(correct, questions.length);
     const pct = (correct / questions.length) * 100;
     addXP(50 + Math.floor(pct * 2));
@@ -70,7 +86,7 @@ export default function Exam() {
     questions.forEach((q, i) => {
       tally[q.domain] ||= { right: 0, total: 0 };
       tally[q.domain].total++;
-      if (answers[i] === q.correct) tally[q.domain].right++;
+      if (isCorrectIndex(q, answers[i])) tally[q.domain].right++;
     });
     return Object.entries(tally).map(([k, v]) => ({ domain: k, score: Math.round((v.right / v.total) * 100) }));
   }, [phase, questions, answers]);
@@ -94,7 +110,7 @@ export default function Exam() {
   }
 
   if (phase === 'done') {
-    const correct = questions.reduce((s, q, i) => s + (answers[i] === q.correct ? 1 : 0), 0);
+    const correct = questions.reduce((s, q, i) => s + (isCorrectIndex(q, answers[i]) ? 1 : 0), 0);
     const pct = Math.round((correct / questions.length) * 100);
     return (
       <div className="max-w-3xl mx-auto space-y-4">
@@ -115,23 +131,29 @@ export default function Exam() {
         )}
         <div className="card">
           <h3 className="font-bold mb-2">Review every question</h3>
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {questions.map((q, i) => {
               const a = answers[i];
-              const ok = a === q.correct;
+              const ok = isCorrectIndex(q, a);
+              const cIdx = correctIndexOf(q);
+              const wIdx = a !== null && a >= 0 && !ok ? wrongIndexFor(q, a) : -1;
               return (
-                <li key={q.id} className="border-b border-border/40 pb-2">
+                <li key={q.id} className="border-b border-border/40 pb-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">Q{i + 1} · {q.domain}</span>
+                    <span className="text-text-secondary">Q{i + 1} · {q.domain} · {q.subObjective}</span>
                     <span className={ok ? 'text-success' : 'text-danger'}>{ok ? '✓' : '✗'}</span>
                   </div>
                   <div className="font-semibold mt-1">{q.question}</div>
                   <div className="text-sm text-text-secondary mt-1">
-                    Correct: <span className="text-success">{q.options?.[q.correct as number]}</span>
-                    {a !== null && a !== q.correct && <> · You picked: <span className="text-danger">{q.options?.[a]}</span></>}
+                    Correct: <span className="text-success">{q.options[cIdx]}</span>
+                    {a !== null && a >= 0 && !ok && <> · You picked: <span className="text-danger">{q.options[a]}</span></>}
                     {a === null && <> · Unanswered</>}
                   </div>
-                  <p className="text-xs text-text-secondary mt-1">{q.explanation}</p>
+                  <p className="text-sm mt-2"><span className="text-success font-semibold">✅</span> <span className="text-text-secondary">{q.explanation.why_correct}</span></p>
+                  {wIdx >= 0 && q.explanation.why_wrong[wIdx] && (
+                    <p className="text-sm mt-1"><span className="text-danger font-semibold">❌</span> <span className="text-text-secondary">{q.explanation.why_wrong[wIdx]}</span></p>
+                  )}
+                  {q.explanation.mnemonic && <p className="text-sm mt-1"><span className="text-warning font-semibold">🧠</span> <span className="text-text-secondary">{q.explanation.mnemonic}</span></p>}
                 </li>
               );
             })}

@@ -11,13 +11,25 @@ type Mode = 'practice' | 'timed';
 
 const TIMED_PER_Q = 30;
 
+function isCorrectIndex(q: Question, i: number): boolean {
+  if (Array.isArray(q.correct)) return q.correct.includes(i);
+  return q.correct === i;
+}
+
+function wrongIndexFor(q: Question, picked: number): number {
+  // why_wrong is indexed by option position, skipping the correct option.
+  if (Array.isArray(q.correct)) return -1;
+  return picked < q.correct ? picked : picked - 1;
+}
+
 export default function QuizRunner() {
   const { mode } = useParams<{ mode: string }>();
   const m: Mode = (mode === 'timed' ? 'timed' : 'practice');
   const [sp] = useSearchParams();
   const dFilter = sp.get('d') as DomainId | null;
 
-  const pool = dFilter ? QUESTIONS_BY_DOMAIN[dFilter] ?? [] : QUESTIONS;
+  // Multi-correct items deferred to Task 5 (exam upgrade); exclude here.
+  const pool = (dFilter ? QUESTIONS_BY_DOMAIN[dFilter] ?? [] : QUESTIONS).filter((q) => q.type !== 'multi');
   const questions = useMemo(() => pickRandom(pool, Math.min(10, pool.length)), [pool]);
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
@@ -51,7 +63,7 @@ export default function QuizRunner() {
   function choose(i: number) {
     if (picked !== null) return;
     setPicked(i);
-    const correct = i === q.correct;
+    const correct = i >= 0 && isCorrectIndex(q, i);
     const tookMs = Date.now() - tStart;
     const tookSec = tookMs / 1000;
     setAnswers((a) => [...a, { q, pickedIdx: i, correct, tookMs }]);
@@ -102,11 +114,11 @@ export default function QuizRunner() {
       </div>
 
       <div className="card">
-        <div className="text-xs text-text-secondary uppercase">{q.domain} · {q.type === 'mc' ? 'Multiple Choice' : 'True / False'}</div>
+        <div className="text-xs text-text-secondary uppercase">{q.domain} · {q.subObjective} · {q.type === 'tf' ? 'True / False' : 'Multiple Choice'}</div>
         <h2 className="text-lg font-bold mt-1">{q.question}</h2>
         <div className="grid gap-2 mt-4">
-          {q.options?.map((opt, i) => {
-            const isCorrect = i === q.correct;
+          {q.options.map((opt, i) => {
+            const isCorrect = isCorrectIndex(q, i);
             const isPicked = picked === i;
             let cls = 'text-left px-4 py-3 rounded-lg border transition-colors ';
             if (picked === null) cls += 'border-border hover:border-accent1';
@@ -121,12 +133,21 @@ export default function QuizRunner() {
           })}
         </div>
         {picked !== null && (
-          <div className="mt-4 p-3 rounded-lg bg-bg/60 border border-border">
-            <div className={picked === q.correct ? 'text-success font-semibold' : 'text-danger font-semibold'}>
-              {picked === q.correct ? '✓ Correct' : picked === -1 ? '⏱ Time out' : '✗ Incorrect'}
+          <div className="mt-4 p-3 rounded-lg bg-bg/60 border border-border space-y-2">
+            <div className={picked >= 0 && isCorrectIndex(q, picked) ? 'text-success font-semibold' : 'text-danger font-semibold'}>
+              {picked >= 0 && isCorrectIndex(q, picked) ? '✓ Correct' : picked === -1 ? '⏱ Time out' : '✗ Incorrect'}
             </div>
-            <p className="text-sm text-text-secondary mt-1">{q.explanation}</p>
-            <button className="btn-primary mt-3" onClick={next}>{idx + 1 < questions.length ? 'Next' : 'See results'}</button>
+            <p className="text-sm"><span className="text-success font-semibold">✅ Why correct:</span> <span className="text-text-secondary">{q.explanation.why_correct}</span></p>
+            {picked >= 0 && !isCorrectIndex(q, picked) && q.explanation.why_wrong[wrongIndexFor(q, picked)] && (
+              <p className="text-sm"><span className="text-danger font-semibold">❌ Why your pick is wrong:</span> <span className="text-text-secondary">{q.explanation.why_wrong[wrongIndexFor(q, picked)]}</span></p>
+            )}
+            {q.explanation.mnemonic && (
+              <p className="text-sm"><span className="text-warning font-semibold">🧠 Mnemonic:</span> <span className="text-text-secondary">{q.explanation.mnemonic}</span></p>
+            )}
+            {q.explanation.refModuleId && (
+              <Link to={`/learn/${q.domain}`} className="text-sm text-accent1 inline-block">🔗 Review {q.domain} · {q.explanation.refModuleId} →</Link>
+            )}
+            <button className="btn-primary mt-2" onClick={next}>{idx + 1 < questions.length ? 'Next' : 'See results'}</button>
           </div>
         )}
       </div>
@@ -171,22 +192,30 @@ function ScoreScreen({ answers, mode, retry }: { answers: { q: Question; pickedI
 
       <div className="card">
         <h3 className="font-bold mb-2">Review</h3>
-        <ul className="space-y-3">
-          {answers.map((a, i) => (
-            <li key={i} className="border-b border-border/40 pb-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-text-secondary">Q{i + 1} · {a.q.domain}</span>
-                <span className={a.correct ? 'text-success' : 'text-danger'}>{a.correct ? '✓' : '✗'}</span>
-              </div>
-              <div className="font-semibold mt-1">{a.q.question}</div>
-              <div className="text-sm text-text-secondary mt-1">
-                Correct: <span className="text-success">{a.q.options?.[a.q.correct as number]}</span>
-                {!a.correct && a.pickedIdx >= 0 && <> · Your pick: <span className="text-danger">{a.q.options?.[a.pickedIdx]}</span></>}
-                {a.pickedIdx === -1 && <> · You ran out of time</>}
-              </div>
-              <p className="text-xs text-text-secondary mt-1">{a.q.explanation}</p>
-            </li>
-          ))}
+        <ul className="space-y-4">
+          {answers.map((a, i) => {
+            const correctIdx = Array.isArray(a.q.correct) ? a.q.correct[0] : a.q.correct;
+            const wrongIdx = a.pickedIdx >= 0 && !a.correct ? (a.pickedIdx < correctIdx ? a.pickedIdx : a.pickedIdx - 1) : -1;
+            return (
+              <li key={i} className="border-b border-border/40 pb-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">Q{i + 1} · {a.q.domain} · {a.q.subObjective}</span>
+                  <span className={a.correct ? 'text-success' : 'text-danger'}>{a.correct ? '✓' : '✗'}</span>
+                </div>
+                <div className="font-semibold mt-1">{a.q.question}</div>
+                <div className="text-sm text-text-secondary mt-1">
+                  Correct: <span className="text-success">{a.q.options[correctIdx]}</span>
+                  {!a.correct && a.pickedIdx >= 0 && <> · Your pick: <span className="text-danger">{a.q.options[a.pickedIdx]}</span></>}
+                  {a.pickedIdx === -1 && <> · You ran out of time</>}
+                </div>
+                <p className="text-sm mt-2"><span className="text-success font-semibold">✅</span> <span className="text-text-secondary">{a.q.explanation.why_correct}</span></p>
+                {wrongIdx >= 0 && a.q.explanation.why_wrong[wrongIdx] && (
+                  <p className="text-sm mt-1"><span className="text-danger font-semibold">❌</span> <span className="text-text-secondary">{a.q.explanation.why_wrong[wrongIdx]}</span></p>
+                )}
+                {a.q.explanation.mnemonic && <p className="text-sm mt-1"><span className="text-warning font-semibold">🧠</span> <span className="text-text-secondary">{a.q.explanation.mnemonic}</span></p>}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
