@@ -3,10 +3,11 @@ import { useStore } from '../store';
 import { DOMAINS } from '../content/domains';
 import { tipForDay } from '../content/tips';
 import { QUESTIONS } from '../content/questions';
+import { FLASHCARDS } from '../content/flashcards';
 import { levelFor, levelProgress } from '../lib/levels';
 import { BADGES, BADGE_BY_ID } from '../lib/badges';
 import { useMemo, useState } from 'react';
-import { Flame, Sparkles, Target, Zap } from 'lucide-react';
+import { Flame, Sparkles, Target, Zap, Layers } from 'lucide-react';
 
 const FAKE_LEADERBOARD = [
   { name: 'NullPointer', xp: 9200, avatar: '🥷' },
@@ -57,9 +58,22 @@ export default function Dashboard() {
   const setDaily = useStore((s) => s.setDailyChallenge);
   const addXP = useStore((s) => s.addXP);
   const recordQuiz = useStore((s) => s.recordQuizAnswer);
+  const srs = useStore((s) => s.srs);
   const lvl = levelFor(xp);
   const lp = levelProgress(xp);
   const nav = useNavigate();
+
+  const { dueCount, newCount } = useMemo(() => {
+    const now = Date.now();
+    let due = 0;
+    let fresh = 0;
+    for (const c of FLASHCARDS) {
+      const s = srs[c.id];
+      if (!s) fresh++;
+      else if (new Date(s.due).getTime() <= now) due++;
+    }
+    return { dueCount: due, newCount: fresh };
+  }, [srs]);
 
   const today = new Date().toISOString().slice(0, 10);
   const dailyPool = useMemo(() => QUESTIONS.filter((q) => q.type !== 'multi'), []);
@@ -161,6 +175,26 @@ export default function Dashboard() {
               <div className="font-bold">{badges.length}/{BADGES.length}</div>
             </div>
           </div>
+          <Link
+            to="/flashcards"
+            className={
+              'mt-3 flex items-center gap-2 rounded-lg p-2 border transition-all ' +
+              (dueCount > 0
+                ? 'border-accent1/60 bg-accent1/10 hover:shadow-neon'
+                : 'border-border bg-surface/40')
+            }
+            aria-label="Open flashcards review"
+          >
+            <Layers size={20} className={dueCount > 0 ? 'text-accent1' : 'text-text-secondary'} />
+            <div className="flex-1 text-left">
+              <div className="text-xs text-text-secondary">Today's review</div>
+              <div className="text-sm">
+                <span className={dueCount > 0 ? 'text-accent1 font-bold' : 'text-text-secondary'}>{dueCount} due</span>
+                <span className="text-text-secondary"> · {newCount} new</span>
+              </div>
+            </div>
+            <span className="text-accent1 text-sm">→</span>
+          </Link>
         </div>
 
         <div className="card md:col-span-2">

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Rating, type Grade } from 'ts-fsrs';
 import { FLASHCARDS } from '../content/flashcards';
 import { useStore } from '../store';
 import { DomainId } from '../lib/storage';
-import { Search } from 'lucide-react';
+import { Search, Zap } from 'lucide-react';
 
 const DOMAIN_FILTERS: { id: 'all' | DomainId; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -14,71 +15,73 @@ const DOMAIN_FILTERS: { id: 'all' | DomainId; label: string }[] = [
   { id: 'D5', label: 'D5' },
 ];
 
+const STATE_LABEL: Record<number, string> = {
+  0: 'New',
+  1: 'Learning',
+  2: 'Review',
+  3: 'Relearning',
+};
+
 export default function Flashcards() {
   const [sp] = useSearchParams();
   const initial = (sp.get('d') as DomainId | null) ?? 'all';
   const [filter, setFilter] = useState<'all' | DomainId>(initial);
   const [search, setSearch] = useState('');
+  const [cram, setCram] = useState(false);
+
   const srs = useStore((s) => s.srs);
-  const setSrs = useStore((s) => s.setSrs);
-  const addXP = useStore((s) => s.addXP);
-  const unlockBadge = useStore((s) => s.unlockBadge);
+  const gradeCard = useStore((s) => s.gradeCard);
 
   const filtered = useMemo(() => {
-    return FLASHCARDS.filter((c) => (filter === 'all' || c.domain === filter))
+    return FLASHCARDS.filter((c) => filter === 'all' || c.domain === filter)
       .filter((c) => !search || c.term.toLowerCase().includes(search.toLowerCase()) || c.def.toLowerCase().includes(search.toLowerCase()));
   }, [filter, search]);
 
-  // study queue: due cards first, then unseen
+  // Build study queue: due cards first (state exists + due <= now), then new (no state).
+  // In cram mode, ignore scheduling — show entire filtered set.
   const queue = useMemo(() => {
+    if (cram) return filtered;
     const now = Date.now();
     const due: typeof filtered = [];
-    const unseen: typeof filtered = [];
-    const future: typeof filtered = [];
+    const fresh: typeof filtered = [];
     for (const c of filtered) {
       const r = srs[c.id];
-      if (!r) unseen.push(c);
-      else if (new Date(r.dueISO).getTime() <= now) due.push(c);
-      else future.push(c);
+      if (!r) fresh.push(c);
+      else if (new Date(r.due).getTime() <= now) due.push(c);
+      // future: skip outside cram mode
     }
-    return [...due, ...unseen, ...future];
-  }, [filtered, srs]);
+    return [...due, ...fresh];
+  }, [filtered, srs, cram]);
 
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const card = queue[idx];
 
-  function know() {
+  function grade(r: Grade) {
     if (!card) return;
-    const cur = srs[card.id]?.box ?? 1;
-    const next = Math.min(5, cur + 1) as 1 | 2 | 3 | 4 | 5;
-    setSrs(card.id, next);
-    addXP(5);
-    advance();
-    // encyclopedia: all FLASHCARDS at box >= 4
-    const allMastered = FLASHCARDS.every((c) => (c.id === card.id ? next >= 4 : (srs[c.id]?.box ?? 0) >= 4));
-    if (allMastered) unlockBadge('encyclopedia');
-  }
-  function dunno() {
-    if (!card) return;
-    setSrs(card.id, 1);
-    advance();
-  }
-  function advance() {
+    gradeCard(card.id, r);
     setFlipped(false);
     setIdx((v) => v + 1);
   }
 
-  const mastered = filtered.filter((c) => (srs[c.id]?.box ?? 0) >= 4).length;
+  const mastered = filtered.filter((c) => {
+    const s = srs[c.id];
+    return s && s.state === 2 && s.reps >= 1;
+  }).length;
+  const dueNow = filtered.filter((c) => {
+    const s = srs[c.id];
+    return s && new Date(s.due).getTime() <= Date.now();
+  }).length;
+  const newCount = filtered.filter((c) => !srs[c.id]).length;
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-extrabold gradient-text">Flashcards</h1>
-        <div className="text-sm text-text-secondary">{mastered} / {filtered.length} mastered</div>
+        <div className="text-sm text-text-secondary">{mastered} / {filtered.length} mastered · {dueNow} due · {newCount} new</div>
       </header>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         {DOMAIN_FILTERS.map((d) => (
           <button
             key={d.id}
@@ -91,6 +94,17 @@ export default function Flashcards() {
             {d.label}
           </button>
         ))}
+        <button
+          className={
+            'px-3 py-1.5 rounded-full text-sm border transition-colors inline-flex items-center gap-1 ' +
+            (cram ? 'border-warning bg-warning/10 text-warning' : 'border-border text-text-secondary hover:text-text-primary')
+          }
+          onClick={() => { setCram((v) => !v); setIdx(0); setFlipped(false); }}
+          aria-pressed={cram}
+          title="Cram mode ignores FSRS scheduling"
+        >
+          <Zap size={14} /> Cram {cram ? 'on' : 'off'}
+        </button>
         <div className="relative ml-auto">
           <Search size={16} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary" />
           <input
@@ -105,7 +119,11 @@ export default function Flashcards() {
       {!card ? (
         <div className="card text-center">
           <h2 className="text-xl font-bold">All caught up 🎉</h2>
-          <p className="text-text-secondary mt-1">No more cards in this filter. Come back later or pick another domain.</p>
+          <p className="text-text-secondary mt-1">
+            {cram
+              ? 'No cards match this filter.'
+              : 'No due or new cards in this filter. Come back later or turn on Cram to study ahead.'}
+          </p>
         </div>
       ) : (
         <>
@@ -116,7 +134,7 @@ export default function Flashcards() {
             <div className="flip-card-inner cursor-pointer">
               <div className="flip-card-front card flex items-center justify-center text-center">
                 <div>
-                  <div className="text-xs text-text-secondary uppercase">{card.domain}</div>
+                  <div className="text-xs text-text-secondary uppercase">{card.domain} · {STATE_LABEL[srs[card.id]?.state ?? 0]}</div>
                   <div className="text-3xl font-extrabold mt-2 gradient-text">{card.term}</div>
                   <div className="text-text-secondary text-xs mt-6">Tap to flip</div>
                 </div>
@@ -130,18 +148,40 @@ export default function Flashcards() {
               </div>
             </div>
           </div>
+
           <div className="flex justify-between items-center">
-            <div className="text-sm text-text-secondary font-mono">{idx + 1} / {queue.length} · Box {srs[card.id]?.box ?? 1}</div>
+            <div className="text-sm text-text-secondary font-mono">{idx + 1} / {queue.length}</div>
+            {srs[card.id]?.last_review && (
+              <div className="text-xs text-text-secondary">
+                Last review: {new Date(srs[card.id]!.last_review!).toLocaleDateString()}
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <button className="btn-secondary py-3" onClick={dunno}>← Again</button>
-            <button className="btn-primary py-3" onClick={know}>Got it →</button>
+
+          <div className="grid grid-cols-4 gap-2">
+            <button className="btn-secondary !min-h-0 py-3 flex-col" onClick={() => grade(Rating.Again)}>
+              <span className="text-danger font-bold">Again</span>
+              <span className="text-[10px] text-text-secondary">1</span>
+            </button>
+            <button className="btn-secondary !min-h-0 py-3 flex-col" onClick={() => grade(Rating.Hard)}>
+              <span className="text-warning font-bold">Hard</span>
+              <span className="text-[10px] text-text-secondary">2</span>
+            </button>
+            <button className="btn-secondary !min-h-0 py-3 flex-col" onClick={() => grade(Rating.Good)}>
+              <span className="text-success font-bold">Good</span>
+              <span className="text-[10px] text-text-secondary">3</span>
+            </button>
+            <button className="btn-secondary !min-h-0 py-3 flex-col" onClick={() => grade(Rating.Easy)}>
+              <span className="text-accent1 font-bold">Easy</span>
+              <span className="text-[10px] text-text-secondary">4</span>
+            </button>
           </div>
           <p className="text-xs text-text-secondary text-center">
-            Leitner spaced repetition — "Got it" pushes the card further into the future. "Again" resets to box 1.
+            FSRS schedules each card by your grade. Again → soon, Easy → far away. Cram mode ignores scheduling.
           </p>
         </>
       )}
     </div>
   );
 }
+

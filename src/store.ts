@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { fsrs, Rating, type Grade } from 'ts-fsrs';
 import {
   DomainId,
   PersistedState,
@@ -6,8 +7,14 @@ import {
   loadProgress,
   saveProgress,
   wipeProgress,
+  defaultFsrsState,
+  deserializeFsrs,
+  serializeFsrs,
 } from './lib/storage';
 import { BADGES } from './lib/badges';
+import { FLASHCARDS } from './content/flashcards';
+
+const scheduler = fsrs();
 
 type Toast = { id: number; msg: string; tone?: 'info' | 'good' | 'bad' };
 
@@ -26,7 +33,7 @@ type StoreActions = {
   recordExam: (score: number, total: number) => void;
   bumpModule: (domain: DomainId, moduleId: string, progress: number) => void;
   setStoryScene: (chapterId: string, scene: number) => void;
-  setSrs: (cardId: string, box: 1 | 2 | 3 | 4 | 5) => void;
+  gradeCard: (cardId: string, rating: Grade) => void;
   registerActivity: () => void;
   unlockBadge: (id: string) => void;
   setSetting: <K extends keyof PersistedState['settings']>(k: K, v: PersistedState['settings'][K]) => void;
@@ -112,10 +119,27 @@ export const useStore = create<StoreState & StoreActions>((set, get) => ({
     set({ storyProgress: { ...get().storyProgress, [chapterId]: scene } });
   },
 
-  setSrs: (cardId, box) => {
-    const days = [0, 1, 2, 4, 7, 14][box] ?? 1;
-    const due = new Date(Date.now() + days * 24 * 3600 * 1000).toISOString();
-    set({ srs: { ...get().srs, [cardId]: { box, dueISO: due } } });
+  gradeCard: (cardId, rating) => {
+    const cur = get();
+    const now = new Date();
+    const prev = cur.srs[cardId];
+    const card = prev ? deserializeFsrs(prev) : deserializeFsrs(defaultFsrsState(now));
+    const { card: next } = scheduler.next(card, now, rating);
+    const nextSer = serializeFsrs(next);
+    set({ srs: { ...cur.srs, [cardId]: nextSer } });
+
+    // tiny XP for any review; bigger when graded Good or Easy
+    const xp = rating === Rating.Again ? 1 : rating === Rating.Hard ? 3 : rating === Rating.Good ? 5 : 7;
+    get().addXP(xp, { silent: true });
+
+    // encyclopedia: all flashcards reached the FSRS Review state with at least one Good/Easy rep.
+    // State 2 = Review in ts-fsrs.
+    const srsAfter = { ...cur.srs, [cardId]: nextSer };
+    const masteredAll = FLASHCARDS.every((c) => {
+      const s = srsAfter[c.id];
+      return s && s.state === 2 && s.reps >= 1;
+    });
+    if (masteredAll) get().unlockBadge('encyclopedia');
   },
 
   registerActivity: () => {
