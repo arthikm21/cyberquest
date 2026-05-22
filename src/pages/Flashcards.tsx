@@ -5,6 +5,7 @@ import { FLASHCARDS } from '../content/flashcards';
 import { useStore } from '../store';
 import { DomainId } from '../lib/storage';
 import { Search, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const DOMAIN_FILTERS: { id: 'all' | DomainId; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -139,11 +140,30 @@ export default function Flashcards() {
                   <div className="text-text-secondary text-xs mt-6">Tap to flip</div>
                 </div>
               </div>
-              <div className="flip-card-back card flex items-center justify-center text-center">
-                <div className="max-w-prose">
-                  <div className="text-xs text-text-secondary uppercase">Definition</div>
-                  <div className="text-lg mt-2">{card.def}</div>
-                  <div className="text-text-secondary text-xs mt-6">Tap to flip back</div>
+              <div className="flip-card-back card overflow-y-auto">
+                <div className="max-w-prose mx-auto h-full flex flex-col">
+                  <div className="text-xs text-text-secondary uppercase text-center">Definition</div>
+                  <div className="text-lg mt-2 text-center">{card.def}</div>
+                  {card.example && (
+                    <div className="text-sm mt-3 text-text-secondary">
+                      <span className="text-accent1 font-semibold">📍 Example:</span> {card.example}
+                    </div>
+                  )}
+                  {card.related && card.related.length > 0 && (
+                    <div className="text-sm mt-2 text-text-secondary">
+                      <span className="text-accent2 font-semibold">🔗 Related:</span> {card.related.join(', ')}
+                    </div>
+                  )}
+                  <div className="mt-auto pt-3 flex items-center justify-between text-xs text-text-secondary">
+                    <Link
+                      to={`/learn/${card.domain}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-accent1 hover:underline"
+                    >
+                      📚 Review {card.domain} module →
+                    </Link>
+                    <span>Tap to flip back</span>
+                  </div>
                 </div>
               </div>
             </div>

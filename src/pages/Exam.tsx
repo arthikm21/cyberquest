@@ -4,6 +4,7 @@ import { QUESTIONS, QUESTIONS_BY_DOMAIN, pickRandom, sampleByBlueprint } from '.
 import { useStore } from '../store';
 import { Question } from '../content/types';
 import { DomainId } from '../lib/storage';
+import Explanation from '../components/Explanation';
 
 const RadarReview = lazy(() => import('../components/RadarReview'));
 
@@ -17,15 +18,6 @@ function isCorrectIndex(q: Question, i: number | null): boolean {
   if (i === null || i < 0) return false;
   if (Array.isArray(q.correct)) return q.correct.includes(i);
   return q.correct === i;
-}
-
-function correctIndexOf(q: Question): number {
-  return Array.isArray(q.correct) ? q.correct[0] : q.correct;
-}
-
-function wrongIndexFor(q: Question, picked: number): number {
-  if (Array.isArray(q.correct)) return -1;
-  return picked < q.correct ? picked : picked - 1;
 }
 
 function newId(): string {
@@ -338,29 +330,22 @@ export default function Exam() {
 
         <div className="card">
           <h3 className="font-bold mb-2">Review every question</h3>
-          <ul className="space-y-4">
+          <ul className="space-y-5">
             {qs.map((q, i) => {
               const a = answers[i];
               const ok = isCorrectIndex(q, a);
-              const cIdx = correctIndexOf(q);
-              const wIdx = a !== null && a >= 0 && !ok ? wrongIndexFor(q, a) : -1;
               return (
                 <li key={q.id} className="border-b border-border/40 pb-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Q{i + 1} · {q.domain} · {q.subObjective}</span>
-                    <span className={ok ? 'text-success' : 'text-danger'}>{ok ? '✓' : '✗'}</span>
+                    <span className={ok ? 'text-success' : 'text-danger'}>
+                      {ok ? '✓' : a === null ? '— unanswered' : '✗'}
+                    </span>
                   </div>
                   <div className="font-semibold mt-1">{q.question}</div>
-                  <div className="text-sm text-text-secondary mt-1">
-                    Correct: <span className="text-success">{q.options[cIdx]}</span>
-                    {a !== null && a >= 0 && !ok && <> · You picked: <span className="text-danger">{q.options[a]}</span></>}
-                    {a === null && <> · Unanswered</>}
+                  <div className="mt-2">
+                    <Explanation q={q} pickedIdx={a !== null && a >= 0 ? a : null} />
                   </div>
-                  <p className="text-sm mt-2"><span className="text-success font-semibold">✅</span> <span className="text-text-secondary">{q.explanation.why_correct}</span></p>
-                  {wIdx >= 0 && q.explanation.why_wrong[wIdx] && (
-                    <p className="text-sm mt-1"><span className="text-danger font-semibold">❌</span> <span className="text-text-secondary">{q.explanation.why_wrong[wIdx]}</span></p>
-                  )}
-                  {q.explanation.mnemonic && <p className="text-sm mt-1"><span className="text-warning font-semibold">🧠</span> <span className="text-text-secondary">{q.explanation.mnemonic}</span></p>}
                 </li>
               );
             })}
