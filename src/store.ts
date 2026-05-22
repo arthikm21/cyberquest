@@ -34,6 +34,8 @@ type StoreActions = {
   bumpModule: (domain: DomainId, moduleId: string, progress: number) => void;
   setStoryScene: (chapterId: string, scene: number) => void;
   gradeCard: (cardId: string, rating: Grade) => void;
+  enqueueRemediation: (questionIds: string[]) => void;
+  recordRemediationAnswer: (questionId: string, correct: boolean, sessionId: string) => void;
   registerActivity: () => void;
   unlockBadge: (id: string) => void;
   setSetting: <K extends keyof PersistedState['settings']>(k: K, v: PersistedState['settings'][K]) => void;
@@ -117,6 +119,49 @@ export const useStore = create<StoreState & StoreActions>((set, get) => ({
 
   setStoryScene: (chapterId, scene) => {
     set({ storyProgress: { ...get().storyProgress, [chapterId]: scene } });
+  },
+
+  enqueueRemediation: (ids) => {
+    const cur = get();
+    const r = { ...cur.remediation };
+    const now = Date.now();
+    let added = 0;
+    for (const id of ids) {
+      if (!r[id]) {
+        r[id] = { addedTs: now, streak: 0 };
+        added++;
+      }
+    }
+    if (added > 0) {
+      set({ remediation: r });
+      get().pushToast(`+${added} item${added === 1 ? '' : 's'} added to remediation queue`, 'info');
+    }
+  },
+
+  recordRemediationAnswer: (id, correct, sessionId) => {
+    const cur = get();
+    const item = cur.remediation[id];
+    if (!item) return; // not enqueued; no-op
+
+    if (!correct) {
+      set({ remediation: { ...cur.remediation, [id]: { ...item, streak: 0, lastSessionId: sessionId } } });
+      return;
+    }
+    // correct
+    if (item.lastSessionId === sessionId) {
+      // same session — don't advance streak (must be across different sessions)
+      set({ remediation: { ...cur.remediation, [id]: { ...item, lastSessionId: sessionId } } });
+      return;
+    }
+    const nextStreak = item.streak + 1;
+    if (nextStreak >= 3) {
+      const next = { ...cur.remediation };
+      delete next[id];
+      set({ remediation: next });
+      get().pushToast('✓ Item graduated from remediation', 'good');
+      return;
+    }
+    set({ remediation: { ...cur.remediation, [id]: { ...item, streak: nextStreak, lastSessionId: sessionId } } });
   },
 
   gradeCard: (cardId, rating) => {
@@ -213,6 +258,7 @@ function debouncedSave() {
       quizHistory: s.quizHistory,
       examBests: s.examBests,
       srs: s.srs,
+      remediation: s.remediation,
       storyProgress: s.storyProgress,
       settings: s.settings,
       dailyChallenge: s.dailyChallenge,
@@ -233,6 +279,7 @@ useStore.subscribe((s, prev) => {
       s.badges === prev.badges &&
       s.quizHistory === prev.quizHistory &&
       s.srs === prev.srs &&
+      s.remediation === prev.remediation &&
       s.storyProgress === prev.storyProgress &&
       s.domainProgress === prev.domainProgress &&
       s.examBests === prev.examBests &&

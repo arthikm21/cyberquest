@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Clock, BookOpen, Trophy } from 'lucide-react';
+import { Clock, BookOpen, Trophy, Wrench } from 'lucide-react';
+import { useStore } from '../store';
 
 const MODES = [
   { id: 'practice', icon: BookOpen, name: 'Practice', desc: 'Untimed, with instant explanations and hints.', color: '#00d4ff' },
@@ -8,12 +9,33 @@ const MODES = [
 ];
 
 export default function Quiz() {
+  const remediation = useStore((s) => s.remediation);
+  const remediationCount = Object.keys(remediation).length;
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-extrabold gradient-text">Quizzes</h1>
         <p className="text-text-secondary">Active recall is the highest-leverage study you can do. Pick a mode.</p>
       </header>
+
+      {remediationCount > 0 && (
+        <Link
+          to="/quiz/remediation"
+          className="card hover:shadow-neon hover:scale-[1.01] transition-all block border-warning/40 !bg-warning/5"
+        >
+          <div className="flex items-start gap-3">
+            <Wrench size={28} className="text-warning shrink-0" />
+            <div>
+              <h2 className="text-lg font-bold">Re-drill missed material</h2>
+              <p className="text-sm text-text-secondary mt-1">
+                <span className="text-warning font-semibold">{remediationCount}</span> item{remediationCount === 1 ? '' : 's'} to re-drill.
+                Each item graduates from the queue after 3 correct answers across different sessions.
+              </p>
+            </div>
+          </div>
+        </Link>
+      )}
 
       <div className="grid md:grid-cols-3 gap-4">
         {MODES.map((m) => (

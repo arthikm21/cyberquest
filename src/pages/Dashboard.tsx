@@ -7,7 +7,7 @@ import { FLASHCARDS } from '../content/flashcards';
 import { levelFor, levelProgress } from '../lib/levels';
 import { BADGES, BADGE_BY_ID } from '../lib/badges';
 import { useMemo, useState } from 'react';
-import { Flame, Sparkles, Target, Zap, Layers } from 'lucide-react';
+import { Flame, Sparkles, Target, Zap, Layers, Wrench } from 'lucide-react';
 
 const FAKE_LEADERBOARD = [
   { name: 'NullPointer', xp: 9200, avatar: '🥷' },
@@ -59,6 +59,7 @@ export default function Dashboard() {
   const addXP = useStore((s) => s.addXP);
   const recordQuiz = useStore((s) => s.recordQuizAnswer);
   const srs = useStore((s) => s.srs);
+  const remediation = useStore((s) => s.remediation);
   const lvl = levelFor(xp);
   const lp = levelProgress(xp);
   const nav = useNavigate();
@@ -195,6 +196,20 @@ export default function Dashboard() {
             </div>
             <span className="text-accent1 text-sm">→</span>
           </Link>
+          {Object.keys(remediation).length > 0 && (
+            <Link
+              to="/quiz/remediation"
+              className="mt-2 flex items-center gap-2 rounded-lg p-2 border border-warning/60 bg-warning/10 hover:shadow-neon-purple transition-all"
+              aria-label="Open remediation quiz"
+            >
+              <Wrench size={20} className="text-warning" />
+              <div className="flex-1 text-left">
+                <div className="text-xs text-text-secondary">Re-drill queue</div>
+                <div className="text-sm text-warning font-bold">{Object.keys(remediation).length} to re-drill</div>
+              </div>
+              <span className="text-warning text-sm">→</span>
+            </Link>
+          )}
         </div>
 
         <div className="card md:col-span-2">

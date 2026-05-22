@@ -2,7 +2,7 @@ import { get, set, del } from 'idb-keyval';
 import { createEmptyCard, State, type Card as FsrsCard } from 'ts-fsrs';
 
 export const KEY = 'cyberquest:v1'; // IDB key name (kept stable across schema versions)
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export type DomainId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
 
@@ -26,6 +26,12 @@ export type FsrsCardState = {
   last_review?: string;
 };
 
+export type RemediationItem = {
+  addedTs: number;
+  streak: number; // consecutive correct answers across different sessions; remove at >= 3
+  lastSessionId?: string;
+};
+
 export type PersistedState = {
   schemaVersion: number;
   userId: string;
@@ -40,6 +46,7 @@ export type PersistedState = {
   quizHistory: Array<{ id: string; correct: boolean; ts: number; domain: DomainId }>;
   examBests: Array<{ score: number; total: number; ts: number }>;
   srs: Record<string, FsrsCardState>;
+  remediation: Record<string, RemediationItem>;
   storyProgress: Record<string, number>;
   settings: Settings;
   dailyChallenge?: { dateISO: string; questionId: string; done: boolean; correct?: boolean };
@@ -98,6 +105,7 @@ export function emptyState(): PersistedState {
     quizHistory: [],
     examBests: [],
     srs: {},
+    remediation: {},
     storyProgress: {},
     settings: { reducedMotion: false, sound: true, theme: 'dark' },
   };

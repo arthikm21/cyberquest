@@ -7,9 +7,14 @@ import { DomainId } from '../lib/storage';
 
 const RadarReview = lazy(() => import('../components/RadarReview'));
 
-type Mode = 'practice' | 'timed';
+type Mode = 'practice' | 'timed' | 'remediation';
 
 const TIMED_PER_Q = 30;
+
+function newSessionId(): string {
+  if (globalThis.crypto && 'randomUUID' in globalThis.crypto) return globalThis.crypto.randomUUID();
+  return 's_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
 function isCorrectIndex(q: Question, i: number): boolean {
   if (Array.isArray(q.correct)) return q.correct.includes(i);
@@ -24,23 +29,43 @@ function wrongIndexFor(q: Question, picked: number): number {
 
 export default function QuizRunner() {
   const { mode } = useParams<{ mode: string }>();
-  const m: Mode = (mode === 'timed' ? 'timed' : 'practice');
+  const m: Mode = mode === 'timed' ? 'timed' : mode === 'remediation' ? 'remediation' : 'practice';
   const [sp] = useSearchParams();
   const dFilter = sp.get('d') as DomainId | null;
 
-  // Multi-correct items deferred to Task 5 (exam upgrade); exclude here.
-  const pool = (dFilter ? QUESTIONS_BY_DOMAIN[dFilter] ?? [] : QUESTIONS).filter((q) => q.type !== 'multi');
+  const remediation = useStore((s) => s.remediation);
+  const recordQuiz = useStore((s) => s.recordQuizAnswer);
+  const addXP = useStore((s) => s.addXP);
+  const unlockBadge = useStore((s) => s.unlockBadge);
+  const bumpModule = useStore((s) => s.bumpModule);
+  const enqueueRemediation = useStore((s) => s.enqueueRemediation);
+  const recordRemediationAnswer = useStore((s) => s.recordRemediationAnswer);
+
+  // Snapshot remediation queue at mount so the running quiz doesn't reshuffle
+  // mid-session as items graduate out.
+  const remediationIdsAtStart = useMemo(() => Object.keys(remediation), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pool selection.
+  //   - remediation mode: items currently in queue
+  //   - domain-filtered: that domain only
+  //   - default: full bank
+  // Multi-correct items deferred to Task 5; exclude here.
+  const pool = useMemo(() => {
+    const base =
+      m === 'remediation'
+        ? QUESTIONS.filter((q) => remediationIdsAtStart.includes(q.id))
+        : dFilter
+        ? QUESTIONS_BY_DOMAIN[dFilter] ?? []
+        : QUESTIONS;
+    return base.filter((q) => q.type !== 'multi');
+  }, [m, dFilter, remediationIdsAtStart]);
   const questions = useMemo(() => pickRandom(pool, Math.min(10, pool.length)), [pool]);
+  const sessionId = useMemo(newSessionId, []);
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [answers, setAnswers] = useState<{ q: Question; pickedIdx: number; correct: boolean; tookMs: number }[]>([]);
   const [tStart, setTStart] = useState(() => Date.now());
   const [tLeft, setTLeft] = useState(TIMED_PER_Q);
-
-  const recordQuiz = useStore((s) => s.recordQuizAnswer);
-  const addXP = useStore((s) => s.addXP);
-  const unlockBadge = useStore((s) => s.unlockBadge);
-  const bumpModule = useStore((s) => s.bumpModule);
 
   const q = questions[idx];
 
@@ -68,6 +93,8 @@ export default function QuizRunner() {
     const tookSec = tookMs / 1000;
     setAnswers((a) => [...a, { q, pickedIdx: i, correct, tookMs }]);
     recordQuiz({ id: q.id, correct, domain: q.domain });
+    // Remediation: store no-ops if this q is not in the queue.
+    recordRemediationAnswer(q.id, correct, sessionId);
     if (correct) {
       let xp = 10;
       if (m === 'timed') xp += Math.max(0, Math.floor((TIMED_PER_Q - tookSec) / 3));
@@ -81,23 +108,35 @@ export default function QuizRunner() {
     setIdx((v) => v + 1);
   }
 
-  if (!q) return <p>No questions in this filter.</p>;
-
-  if (idx >= questions.length) {
+  // Finalization side-effects run exactly once when the quiz completes.
+  const [finalized, setFinalized] = useState(false);
+  useEffect(() => {
+    if (idx < questions.length || answers.length !== questions.length || finalized) return;
     const total = answers.length;
     const correctCount = answers.filter((a) => a.correct).length;
-    const pct = Math.round((correctCount / total) * 100);
+    const pct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
     const totalSec = answers.reduce((s, a) => s + a.tookMs / 1000, 0);
-    if (m === 'timed' && totalSec < TIMED_PER_Q * total / 2 && pct >= 60) unlockBadge('speed_demon');
-    if (pct === 100) addXP(50); // perfect bonus
-    // bump domain module slightly based on results
-    if (dFilter) {
-      const dProg = pct / 100;
-      bumpModule(dFilter, `quiz-${Date.now()}`, dProg);
+    if (m === 'timed' && totalSec < (TIMED_PER_Q * total) / 2 && pct >= 60) unlockBadge('speed_demon');
+    if (pct === 100 && total > 0) addXP(50);
+    if (dFilter) bumpModule(dFilter, `quiz-${Date.now()}`, pct / 100);
+
+    // Remediation: enqueue 3 siblings per missed question.
+    const siblingIds: string[] = [];
+    for (const a of answers) {
+      if (a.correct) continue;
+      const subPool = QUESTIONS.filter((qq) => qq.subObjective === a.q.subObjective && qq.id !== a.q.id && qq.type !== 'multi');
+      const picks = pickRandom(subPool, Math.min(3, subPool.length)).map((qq) => qq.id);
+      siblingIds.push(...picks);
     }
-    return (
-      <ScoreScreen answers={answers} mode={m} retry={() => location.reload()} />
-    );
+    if (siblingIds.length > 0) enqueueRemediation(siblingIds);
+
+    setFinalized(true);
+  }, [idx, questions.length, answers, finalized, m, dFilter, addXP, unlockBadge, bumpModule, enqueueRemediation]);
+
+  if (!q) return <p className="card">No questions in this filter.{m === 'remediation' && <> <Link to="/quiz" className="text-accent1">← Back to quizzes</Link></>}</p>;
+
+  if (idx >= questions.length) {
+    return <ScoreScreen answers={answers} mode={m} retry={() => location.reload()} />;
   }
 
   return (

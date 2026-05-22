@@ -31,6 +31,7 @@ export default function Settings() {
       quizHistory: s.quizHistory,
       examBests: s.examBests,
       srs: s.srs,
+      remediation: s.remediation,
       storyProgress: s.storyProgress,
       settings: s.settings,
       dailyChallenge: s.dailyChallenge,

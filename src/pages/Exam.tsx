@@ -36,6 +36,7 @@ export default function Exam() {
   const [now, setNow] = useState(Date.now());
   const recordExam = useStore((s) => s.recordExam);
   const addXP = useStore((s) => s.addXP);
+  const enqueueRemediation = useStore((s) => s.enqueueRemediation);
 
   useEffect(() => {
     if (phase !== 'taking') return;
@@ -77,6 +78,17 @@ export default function Exam() {
     recordExam(correct, questions.length);
     const pct = (correct / questions.length) * 100;
     addXP(50 + Math.floor(pct * 2));
+
+    // Remediation: enqueue 3 siblings per missed question.
+    const siblingIds: string[] = [];
+    questions.forEach((q, i) => {
+      if (isCorrectIndex(q, answers[i])) return;
+      const subPool = QUESTIONS.filter((qq) => qq.subObjective === q.subObjective && qq.id !== q.id && qq.type !== 'multi');
+      const picks = pickRandom(subPool, Math.min(3, subPool.length)).map((qq) => qq.id);
+      siblingIds.push(...picks);
+    });
+    if (siblingIds.length > 0) enqueueRemediation(siblingIds);
+
     setPhase('done');
   }
 
