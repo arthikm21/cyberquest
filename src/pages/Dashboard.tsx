@@ -7,7 +7,8 @@ import { FLASHCARDS } from '../content/flashcards';
 import { levelFor, levelProgress } from '../lib/levels';
 import { BADGES, BADGE_BY_ID } from '../lib/badges';
 import { lazy, Suspense, useMemo, useState } from 'react';
-import { Flame, Sparkles, Target, Zap, Layers, Wrench, TrendingUp } from 'lucide-react';
+import { Flame, Sparkles, Target, Zap, Layers, Wrench, TrendingUp, ShieldCheck, AlertTriangle, Trophy } from 'lucide-react';
+import { computeReadiness, weakSubObjectivesIn } from '../lib/readiness';
 
 const ExamTrend = lazy(() => import('../components/ExamTrend'));
 
@@ -64,7 +65,16 @@ export default function Dashboard() {
   const remediation = useStore((s) => s.remediation);
   const examAttempts = useStore((s) => s.examAttempts);
   const diagnostic = useStore((s) => s.diagnosticResult);
+  const quizHistory = useStore((s) => s.quizHistory);
   const lvl = levelFor(xp);
+
+  const readiness = useMemo(() => computeReadiness(examAttempts), [examAttempts]);
+  const weakSubs = useMemo(() => {
+    if (readiness.ready || readiness.blocker !== 'weak_domain' || !readiness.weakDomain) return [];
+    const lookup = new Map<string, string>();
+    for (const q of QUESTIONS) lookup.set(q.id, q.subObjective);
+    return weakSubObjectivesIn(readiness.weakDomain, quizHistory, lookup, 5);
+  }, [readiness, quizHistory]);
   const lp = levelProgress(xp);
   const nav = useNavigate();
 
@@ -253,6 +263,85 @@ export default function Dashboard() {
               {daily.correct ? '✓ Correct.' : '✗ Not quite.'} {dailyQ.explanation.why_correct}
             </p>
           )}
+        </div>
+      </section>
+
+      {/* CC Readiness gate */}
+      <section
+        className={
+          'card border ' +
+          (readiness.ready
+            ? 'border-success/60 !bg-success/5 shadow-neon'
+            : 'border-border')
+        }
+        aria-label="CC exam readiness"
+      >
+        <div className="flex items-start gap-3">
+          {readiness.ready ? (
+            <ShieldCheck size={28} className="text-success shrink-0" />
+          ) : (
+            <AlertTriangle size={28} className="text-warning shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-text-secondary uppercase tracking-wide">CC Readiness</div>
+            {readiness.ready ? (
+              <>
+                <h3 className="text-xl font-extrabold text-success mt-1">READY</h3>
+                <p className="text-sm text-text-secondary mt-1">
+                  Three 100-Q mocks ≥ 900 in the last 14 days · avg scaled <span className="text-text-primary font-mono">{readiness.avgScaled}</span> ·
+                  no domain below 80%. You're inside the safety margin for the real exam.
+                </p>
+                <div className="grid grid-cols-5 gap-2 mt-3 text-xs">
+                  {(Object.keys(readiness.perDomainAcc) as (keyof typeof readiness.perDomainAcc)[]).map((d) => (
+                    <div key={d} className="bg-bg/60 rounded p-2 text-center">
+                      <div className="text-text-secondary">{d}</div>
+                      <div className="font-mono text-success">{Math.round(readiness.perDomainAcc[d] * 100)}%</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl font-extrabold text-warning mt-1">NOT READY</h3>
+                <p className="text-sm text-text-secondary mt-1">{readiness.reason}</p>
+                {readiness.blocker === 'weak_domain' && readiness.weakDomain && (
+                  <>
+                    {weakSubs.length > 0 ? (
+                      <div className="mt-3">
+                        <div className="text-xs text-text-secondary uppercase">Drill these {readiness.weakDomain} sub-objectives</div>
+                        <ul className="mt-1 space-y-1">
+                          {weakSubs.map((w) => (
+                            <li key={w.subObjective} className="text-sm flex items-baseline gap-2">
+                              <span className="font-mono text-danger">{Math.round(w.acc * 100)}%</span>
+                              <span className="text-text-secondary">{w.subObjective}</span>
+                              <span className="text-text-secondary text-xs">({w.n} answered)</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-text-secondary mt-2">
+                        Not enough sub-objective data yet. Take more {readiness.weakDomain} practice quizzes so weak topics surface here.
+                      </p>
+                    )}
+                  </>
+                )}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {readiness.blocker === 'no_attempts' || readiness.blocker === 'too_few_attempts' ? (
+                    <Link to="/exam" className="btn-primary"><Trophy size={16} /> Take a mock exam</Link>
+                  ) : null}
+                  {readiness.blocker === 'weak_domain' && readiness.weakDomain && (
+                    <Link to={`/quiz/practice?d=${readiness.weakDomain}`} className="btn-primary">
+                      <Zap size={16} /> Practice {readiness.weakDomain}
+                    </Link>
+                  )}
+                  {readiness.blocker === 'low_score' && (
+                    <Link to="/exam" className="btn-primary"><Trophy size={16} /> Retake mock</Link>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
