@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate content
+        run: npm run validate-content
+
       - name: Type-check
         run: npx tsc --noEmit
 
