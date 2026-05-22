@@ -32,6 +32,8 @@ export default function Settings() {
       examBests: s.examBests,
       srs: s.srs,
       remediation: s.remediation,
+      examAttempts: s.examAttempts,
+      examSession: s.examSession,
       storyProgress: s.storyProgress,
       settings: s.settings,
       dailyChallenge: s.dailyChallenge,

@@ -3,6 +3,8 @@ import { fsrs, Rating, type Grade } from 'ts-fsrs';
 import {
   DomainId,
   PersistedState,
+  ExamSession,
+  ExamAttempt,
   emptyState,
   loadProgress,
   saveProgress,
@@ -36,6 +38,10 @@ type StoreActions = {
   gradeCard: (cardId: string, rating: Grade) => void;
   enqueueRemediation: (questionIds: string[]) => void;
   recordRemediationAnswer: (questionId: string, correct: boolean, sessionId: string) => void;
+  startExamSession: (s: ExamSession) => void;
+  updateExamSession: (patch: Partial<ExamSession>) => void;
+  finishExamAttempt: (a: ExamAttempt) => void;
+  clearExamSession: () => void;
   registerActivity: () => void;
   unlockBadge: (id: string) => void;
   setSetting: <K extends keyof PersistedState['settings']>(k: K, v: PersistedState['settings'][K]) => void;
@@ -137,6 +143,21 @@ export const useStore = create<StoreState & StoreActions>((set, get) => ({
       get().pushToast(`+${added} item${added === 1 ? '' : 's'} added to remediation queue`, 'info');
     }
   },
+
+  startExamSession: (s) => set({ examSession: s }),
+  updateExamSession: (patch) => {
+    const cur = get().examSession;
+    if (!cur) return;
+    set({ examSession: { ...cur, ...patch } });
+  },
+  finishExamAttempt: (a) => {
+    const attempts = [...get().examAttempts, a].slice(-50);
+    set({ examAttempts: attempts, examSession: undefined });
+    // legacy examBests mirror — keep filled for backward compat
+    const bests = [...get().examBests, { score: a.rawCorrect, total: a.total, ts: a.finishedTs }].slice(-20);
+    set({ examBests: bests });
+  },
+  clearExamSession: () => set({ examSession: undefined }),
 
   recordRemediationAnswer: (id, correct, sessionId) => {
     const cur = get();
@@ -259,6 +280,8 @@ function debouncedSave() {
       examBests: s.examBests,
       srs: s.srs,
       remediation: s.remediation,
+      examAttempts: s.examAttempts,
+      examSession: s.examSession,
       storyProgress: s.storyProgress,
       settings: s.settings,
       dailyChallenge: s.dailyChallenge,
@@ -280,6 +303,8 @@ useStore.subscribe((s, prev) => {
       s.quizHistory === prev.quizHistory &&
       s.srs === prev.srs &&
       s.remediation === prev.remediation &&
+      s.examAttempts === prev.examAttempts &&
+      s.examSession === prev.examSession &&
       s.storyProgress === prev.storyProgress &&
       s.domainProgress === prev.domainProgress &&
       s.examBests === prev.examBests &&

@@ -63,6 +63,19 @@ body {
   min-height: 44px;
 }
 
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  border: 1px solid #1f2937;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #111827;
+  color: #f9fafb;
+  line-height: 1.4;
+}
+
 /* focus visible */
 :focus-visible {
   outline: 2px solid #00d4ff;

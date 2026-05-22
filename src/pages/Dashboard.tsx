@@ -6,8 +6,10 @@ import { QUESTIONS } from '../content/questions';
 import { FLASHCARDS } from '../content/flashcards';
 import { levelFor, levelProgress } from '../lib/levels';
 import { BADGES, BADGE_BY_ID } from '../lib/badges';
-import { useMemo, useState } from 'react';
-import { Flame, Sparkles, Target, Zap, Layers, Wrench } from 'lucide-react';
+import { lazy, Suspense, useMemo, useState } from 'react';
+import { Flame, Sparkles, Target, Zap, Layers, Wrench, TrendingUp } from 'lucide-react';
+
+const ExamTrend = lazy(() => import('../components/ExamTrend'));
 
 const FAKE_LEADERBOARD = [
   { name: 'NullPointer', xp: 9200, avatar: '🥷' },
@@ -60,6 +62,7 @@ export default function Dashboard() {
   const recordQuiz = useStore((s) => s.recordQuizAnswer);
   const srs = useStore((s) => s.srs);
   const remediation = useStore((s) => s.remediation);
+  const examAttempts = useStore((s) => s.examAttempts);
   const lvl = levelFor(xp);
   const lp = levelProgress(xp);
   const nav = useNavigate();
@@ -251,6 +254,27 @@ export default function Dashboard() {
           )}
         </div>
       </section>
+
+      {/* exam trend (only when data exists) */}
+      {examAttempts.length > 0 && (
+        <section className="card">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 text-xs text-text-secondary uppercase tracking-wide">
+                <TrendingUp size={14} /> Exam scaled-score trend
+              </div>
+              <h3 className="text-lg font-bold mt-1">Last {Math.min(10, examAttempts.length)} mock{examAttempts.length === 1 ? '' : 's'}</h3>
+              <p className="text-xs text-text-secondary">Pass line at 700. Aim for ≥ 900 consistently before the real exam.</p>
+            </div>
+            <Link to="/exam" className="btn-secondary !min-h-0 !py-1 text-sm">New attempt →</Link>
+          </div>
+          <div className="mt-3">
+            <Suspense fallback={<div className="h-[180px] flex items-center justify-center text-text-secondary text-sm">Loading trend…</div>}>
+              <ExamTrend attempts={examAttempts} />
+            </Suspense>
+          </div>
+        </section>
+      )}
 
       {/* domains */}
       <section>

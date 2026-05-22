@@ -2,7 +2,7 @@ import { get, set, del } from 'idb-keyval';
 import { createEmptyCard, State, type Card as FsrsCard } from 'ts-fsrs';
 
 export const KEY = 'cyberquest:v1'; // IDB key name (kept stable across schema versions)
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export type DomainId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
 
@@ -32,6 +32,27 @@ export type RemediationItem = {
   lastSessionId?: string;
 };
 
+export type ExamAttempt = {
+  id: string;
+  startedTs: number;
+  finishedTs: number;
+  total: number;
+  rawCorrect: number;
+  scaledScore: number; // 0..1000, linear map (raw/total * 1000)
+  perDomain: Record<DomainId, { right: number; total: number }>;
+  timeUsedSec: number;
+};
+
+export type ExamSession = {
+  id: string;
+  startedTs: number;
+  durationSec: number; // wall-clock duration; remaining = durationSec - (now - startedTs)
+  questionIds: string[];
+  answers: (number | null)[];
+  flagged: boolean[];
+  currentIdx: number;
+};
+
 export type PersistedState = {
   schemaVersion: number;
   userId: string;
@@ -45,6 +66,8 @@ export type PersistedState = {
   badges: string[];
   quizHistory: Array<{ id: string; correct: boolean; ts: number; domain: DomainId }>;
   examBests: Array<{ score: number; total: number; ts: number }>;
+  examAttempts: ExamAttempt[];
+  examSession?: ExamSession;
   srs: Record<string, FsrsCardState>;
   remediation: Record<string, RemediationItem>;
   storyProgress: Record<string, number>;
@@ -104,6 +127,7 @@ export function emptyState(): PersistedState {
     badges: [],
     quizHistory: [],
     examBests: [],
+    examAttempts: [],
     srs: {},
     remediation: {},
     storyProgress: {},
