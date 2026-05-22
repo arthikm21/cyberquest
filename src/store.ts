@@ -5,6 +5,8 @@ import {
   PersistedState,
   ExamSession,
   ExamAttempt,
+  DiagnosticResult,
+  StudyPlan,
   emptyState,
   loadProgress,
   saveProgress,
@@ -13,6 +15,7 @@ import {
   deserializeFsrs,
   serializeFsrs,
 } from './lib/storage';
+import { accuracyFromHistory, recomputeStudyPlan as recomputePlan } from './lib/studyplan';
 import { BADGES } from './lib/badges';
 import { FLASHCARDS } from './content/flashcards';
 
@@ -42,6 +45,11 @@ type StoreActions = {
   updateExamSession: (patch: Partial<ExamSession>) => void;
   finishExamAttempt: (a: ExamAttempt) => void;
   clearExamSession: () => void;
+  setDiagnostic: (r: DiagnosticResult) => void;
+  setStudyPlan: (p: StudyPlan) => void;
+  markStudyDayDone: (isoDate: string, done?: boolean) => void;
+  recomputeStudyPlanWeekly: () => void;
+  resetStudyPlan: () => void;
   registerActivity: () => void;
   unlockBadge: (id: string) => void;
   setSetting: <K extends keyof PersistedState['settings']>(k: K, v: PersistedState['settings'][K]) => void;
@@ -158,6 +166,28 @@ export const useStore = create<StoreState & StoreActions>((set, get) => ({
     set({ examBests: bests });
   },
   clearExamSession: () => set({ examSession: undefined }),
+
+  setDiagnostic: (r) => set({ diagnosticResult: r }),
+  setStudyPlan: (p) => set({ studyPlan: p }),
+  markStudyDayDone: (isoDate, done = true) => {
+    const cur = get().studyPlan;
+    if (!cur) return;
+    const days = cur.days.map((d) => (d.isoDate === isoDate ? { ...d, done } : d));
+    set({ studyPlan: { ...cur, days } });
+  },
+  recomputeStudyPlanWeekly: () => {
+    const cur = get();
+    if (!cur.studyPlan) return;
+    const last = cur.studyPlan.lastRecomputeISO;
+    const today = new Date().toISOString().slice(0, 10);
+    const lastDate = last ? new Date(last + 'T00:00:00').getTime() : 0;
+    if (Date.now() - lastDate < 6 * 86400 * 1000) return; // ~weekly
+    const sinceTs = Date.now() - 7 * 86400 * 1000;
+    const acc = accuracyFromHistory(cur.quizHistory, sinceTs);
+    const next = recomputePlan(cur.studyPlan, acc);
+    set({ studyPlan: { ...next, lastRecomputeISO: today } });
+  },
+  resetStudyPlan: () => set({ studyPlan: undefined, diagnosticResult: undefined }),
 
   recordRemediationAnswer: (id, correct, sessionId) => {
     const cur = get();
@@ -282,6 +312,8 @@ function debouncedSave() {
       remediation: s.remediation,
       examAttempts: s.examAttempts,
       examSession: s.examSession,
+      diagnosticResult: s.diagnosticResult,
+      studyPlan: s.studyPlan,
       storyProgress: s.storyProgress,
       settings: s.settings,
       dailyChallenge: s.dailyChallenge,
@@ -305,6 +337,8 @@ useStore.subscribe((s, prev) => {
       s.remediation === prev.remediation &&
       s.examAttempts === prev.examAttempts &&
       s.examSession === prev.examSession &&
+      s.diagnosticResult === prev.diagnosticResult &&
+      s.studyPlan === prev.studyPlan &&
       s.storyProgress === prev.storyProgress &&
       s.domainProgress === prev.domainProgress &&
       s.examBests === prev.examBests &&

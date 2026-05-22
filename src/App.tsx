@@ -20,6 +20,7 @@ const GameRunner = lazy(() => import('./pages/GameRunner'));
 const Exam = lazy(() => import('./pages/Exam'));
 const Glossary = lazy(() => import('./pages/Glossary'));
 const StudyPlan = lazy(() => import('./pages/StudyPlan'));
+const Diagnostic = lazy(() => import('./pages/Diagnostic'));
 const Achievements = lazy(() => import('./pages/Achievements'));
 const Settings = lazy(() => import('./pages/Settings'));
 
@@ -89,6 +90,7 @@ export default function App() {
           <Route path="exam" element={<Suspense fallback={<LoadingShell />}><Exam /></Suspense>} />
           <Route path="glossary" element={<Suspense fallback={<LoadingShell />}><Glossary /></Suspense>} />
           <Route path="study-plan" element={<Suspense fallback={<LoadingShell />}><StudyPlan /></Suspense>} />
+          <Route path="diagnostic" element={<Suspense fallback={<LoadingShell />}><Diagnostic /></Suspense>} />
           <Route path="achievements" element={<Suspense fallback={<LoadingShell />}><Achievements /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<LoadingShell />}><Settings /></Suspense>} />
           <Route path="*" element={<div className="p-10 text-center"><h2 className="text-2xl font-bold mb-2">404</h2><p className="text-text-secondary">Page not found.</p></div>} />

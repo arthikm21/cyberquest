@@ -34,6 +34,8 @@ export default function Settings() {
       remediation: s.remediation,
       examAttempts: s.examAttempts,
       examSession: s.examSession,
+      diagnosticResult: s.diagnosticResult,
+      studyPlan: s.studyPlan,
       storyProgress: s.storyProgress,
       settings: s.settings,
       dailyChallenge: s.dailyChallenge,
@@ -85,6 +87,9 @@ export default function Settings() {
         <Toggle label="Sound (placeholder)" checked={settings.sound} onChange={(v) => setSetting('sound', v)} />
       </section>
 
+      <StudyPlanReset />
+
+
       <section className="card space-y-3">
         <h2 className="font-bold">Account (coming soon)</h2>
         <p className="text-sm text-text-secondary">Cross-device sync via account is on the roadmap. Today, your progress lives on this browser.</p>
@@ -118,6 +123,36 @@ export default function Settings() {
         <p>v0.1.0 · Schema {SCHEMA_VERSION}</p>
       </section>
     </div>
+  );
+}
+
+function StudyPlanReset() {
+  const studyPlan = useStore((s) => s.studyPlan);
+  const diagnostic = useStore((s) => s.diagnosticResult);
+  const resetPlan = useStore((s) => s.resetStudyPlan);
+  const pushToast = useStore((s) => s.pushToast);
+  const has = !!studyPlan || !!diagnostic;
+  return (
+    <section className="card space-y-3">
+      <h2 className="font-bold">Study Plan</h2>
+      {has ? (
+        <>
+          <p className="text-sm text-text-secondary">Reset your diagnostic and 4-week plan. You can rerun the diagnostic any time.</p>
+          <button
+            className="btn-ghost text-danger"
+            onClick={() => {
+              if (!confirm('Reset diagnostic + plan? Quiz history and other progress are kept.')) return;
+              resetPlan();
+              pushToast('Study plan reset.', 'info');
+            }}
+          >
+            Reset study plan
+          </button>
+        </>
+      ) : (
+        <p className="text-sm text-text-secondary">No plan yet. Take the diagnostic from the Study Plan page to generate one.</p>
+      )}
+    </section>
   );
 }
 

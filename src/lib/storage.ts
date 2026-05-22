@@ -2,7 +2,7 @@ import { get, set, del } from 'idb-keyval';
 import { createEmptyCard, State, type Card as FsrsCard } from 'ts-fsrs';
 
 export const KEY = 'cyberquest:v1'; // IDB key name (kept stable across schema versions)
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export type DomainId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
 
@@ -53,6 +53,32 @@ export type ExamSession = {
   currentIdx: number;
 };
 
+export type DiagnosticResult = {
+  takenAt: number;
+  total: number;
+  perDomain: Record<DomainId, { right: number; total: number; pct: number }>;
+};
+
+export type StudyPlanDay = {
+  isoDate: string; // YYYY-MM-DD
+  focusDomain: DomainId;
+  lessonModuleId?: string;
+  quizCount: number;
+  cardCount: number;
+  done: boolean;
+};
+
+export type StudyPlan = {
+  id: string;
+  createdAt: number;
+  startISO: string;
+  weeks: number; // 4
+  days: StudyPlanDay[];
+  hoursPerWeek: number;
+  lastRecomputeISO?: string;
+  baselineAccuracy: Record<DomainId, number>;
+};
+
 export type PersistedState = {
   schemaVersion: number;
   userId: string;
@@ -68,6 +94,8 @@ export type PersistedState = {
   examBests: Array<{ score: number; total: number; ts: number }>;
   examAttempts: ExamAttempt[];
   examSession?: ExamSession;
+  diagnosticResult?: DiagnosticResult;
+  studyPlan?: StudyPlan;
   srs: Record<string, FsrsCardState>;
   remediation: Record<string, RemediationItem>;
   storyProgress: Record<string, number>;

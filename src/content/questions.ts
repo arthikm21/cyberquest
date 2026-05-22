@@ -2005,8 +2005,19 @@ export function sampleByBlueprint(total: number, seed?: number): Question[] {
   const out: Question[] = [];
   for (const d of ['D1', 'D2', 'D3', 'D4', 'D5'] as const) {
     const want = Math.round((weights[d] / 100) * total);
-    const pool = QUESTIONS_BY_DOMAIN[d] ?? [];
+    const pool = (QUESTIONS_BY_DOMAIN[d] ?? []).filter((q) => q.type !== 'multi');
     out.push(...pickRandom(pool, Math.min(want, pool.length), seed));
+  }
+  return pickRandom(out, out.length, seed);
+}
+
+// Diagnostic draw — 30 questions with fixed per-domain counts 6/3/7/8/6 (sums to 30).
+export function sampleDiagnostic(seed?: number): Question[] {
+  const counts: Record<string, number> = { D1: 6, D2: 3, D3: 7, D4: 8, D5: 6 };
+  const out: Question[] = [];
+  for (const d of ['D1', 'D2', 'D3', 'D4', 'D5'] as const) {
+    const pool = (QUESTIONS_BY_DOMAIN[d] ?? []).filter((q) => q.type !== 'multi');
+    out.push(...pickRandom(pool, Math.min(counts[d], pool.length), seed));
   }
   return pickRandom(out, out.length, seed);
 }

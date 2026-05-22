@@ -63,6 +63,7 @@ export default function Dashboard() {
   const srs = useStore((s) => s.srs);
   const remediation = useStore((s) => s.remediation);
   const examAttempts = useStore((s) => s.examAttempts);
+  const diagnostic = useStore((s) => s.diagnosticResult);
   const lvl = levelFor(xp);
   const lp = levelProgress(xp);
   const nav = useNavigate();
@@ -254,6 +255,21 @@ export default function Dashboard() {
           )}
         </div>
       </section>
+
+      {/* diagnostic nudge (only when no result yet) */}
+      {!diagnostic && (
+        <Link
+          to="/diagnostic"
+          className="card flex items-center gap-3 hover:shadow-neon transition-all border-accent1/40 !bg-accent1/5"
+        >
+          <Sparkles size={24} className="text-accent1 shrink-0" />
+          <div className="flex-1">
+            <div className="font-bold">Run the 30-question diagnostic</div>
+            <div className="text-sm text-text-secondary">10–15 minutes. We'll measure your starting accuracy per domain and build a 4-week adaptive study plan.</div>
+          </div>
+          <span className="text-accent1">→</span>
+        </Link>
+      )}
 
       {/* exam trend (only when data exists) */}
       {examAttempts.length > 0 && (
