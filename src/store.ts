@@ -17,7 +17,6 @@ import {
 } from './lib/storage';
 import { accuracyFromHistory, recomputeStudyPlan as recomputePlan } from './lib/studyplan';
 import { BADGES } from './lib/badges';
-import { FLASHCARDS } from './content/flashcards';
 
 const scheduler = fsrs();
 
@@ -227,15 +226,8 @@ export const useStore = create<StoreState & StoreActions>((set, get) => ({
     // tiny XP for any review; bigger when graded Good or Easy
     const xp = rating === Rating.Again ? 1 : rating === Rating.Hard ? 3 : rating === Rating.Good ? 5 : 7;
     get().addXP(xp, { silent: true });
-
-    // encyclopedia: all flashcards reached the FSRS Review state with at least one Good/Easy rep.
-    // State 2 = Review in ts-fsrs.
-    const srsAfter = { ...cur.srs, [cardId]: nextSer };
-    const masteredAll = FLASHCARDS.every((c) => {
-      const s = srsAfter[c.id];
-      return s && s.state === 2 && s.reps >= 1;
-    });
-    if (masteredAll) get().unlockBadge('encyclopedia');
+    // encyclopedia badge check is in Flashcards.tsx (so store stays free of the
+    // 80KB flashcards bank in the initial bundle).
   },
 
   registerActivity: () => {

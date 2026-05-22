@@ -32,6 +32,7 @@ export default function Flashcards() {
 
   const srs = useStore((s) => s.srs);
   const gradeCard = useStore((s) => s.gradeCard);
+  const unlockBadge = useStore((s) => s.unlockBadge);
 
   const filtered = useMemo(() => {
     return FLASHCARDS.filter((c) => filter === 'all' || c.domain === filter)
@@ -61,6 +62,16 @@ export default function Flashcards() {
   function grade(r: Grade) {
     if (!card) return;
     gradeCard(card.id, r);
+    // Encyclopedia: every flashcard in FSRS Review state with reps >= 1.
+    // Check post-grade so the badge can fire immediately on the unlocking review.
+    queueMicrotask(() => {
+      const after = useStore.getState().srs;
+      const allMastered = FLASHCARDS.every((c) => {
+        const s = after[c.id];
+        return s && s.state === 2 && s.reps >= 1;
+      });
+      if (allMastered) unlockBadge('encyclopedia');
+    });
     setFlipped(false);
     setIdx((v) => v + 1);
   }

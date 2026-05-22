@@ -29,7 +29,7 @@ export type Flashcard = {
   term: string;
   def: string;
   domain: DomainId;
-  subObjective?: string;
+  subObjective: string; // required as of Task 8
   example?: string;
   related?: string[];
 };
